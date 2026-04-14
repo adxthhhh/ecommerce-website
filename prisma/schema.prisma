@@ -8,11 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  // Use connection pooling URL at runtime (PgBouncer)
-  url       = env("DATABASE_URL")
-  // Use direct URL only for migrations
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 // ============================================================
