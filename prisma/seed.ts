@@ -1,10 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import { MOCK_PRODUCTS } from '../src/lib/mock-data';
 import * as dotenv from 'dotenv';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 dotenv.config({ path: '.env.local' });
 
-const prisma = new PrismaClient();
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Seeding database...');

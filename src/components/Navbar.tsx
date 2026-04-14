@@ -7,11 +7,32 @@
 
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
+import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState } from 'react';
+import { User } from '@supabase/supabase-js';
+import { signOut } from '@/app/auth/actions';
 
 export default function Navbar() {
   const toggleCart = useCartStore((s) => s.toggleCart);
   const totalItems = useCartStore((s) => s.totalItems);
   const count = totalItems();
+  
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   return (
     <header
@@ -43,29 +64,53 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* ── Cart button ── */}
-        <button
-          id="nav-cart-btn"
-          onClick={toggleCart}
-          aria-label={`Open cart, ${count} item${count !== 1 ? 's' : ''}`}
-          className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold
-                     border border-[#e5e5e5] text-black hover:border-black hover:bg-black
-                     hover:text-white transition-base"
-          style={{ borderRadius: 'var(--radius-sm)' }}
-        >
-          <span aria-hidden="true">◈</span>
-          <span>Cart</span>
-          {count > 0 && (
-            <span
-              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1
-                         bg-black text-white text-[10px] font-bold flex items-center justify-center tabular-nums"
-              style={{ borderRadius: 'var(--radius-full)' }}
-              aria-live="polite"
+        {/* ── Right side actions ── */}
+        <div className="flex items-center gap-4">
+          {user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-bold text-black hidden sm:inline">
+                {user.user_metadata?.name || user.email}
+              </span>
+              <button
+                onClick={() => signOut()}
+                className="text-xs font-bold uppercase tracking-widest hover:text-red-600 transition-base"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-base"
             >
-              {count > 99 ? '99+' : count}
-            </span>
+              Sign In
+            </Link>
           )}
-        </button>
+
+          {/* ── Cart button ── */}
+          <button
+            id="nav-cart-btn"
+            onClick={toggleCart}
+            aria-label={`Open cart, ${count} item${count !== 1 ? 's' : ''}`}
+            className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold
+                       border border-[#e5e5e5] text-black hover:border-black hover:bg-black
+                       hover:text-white transition-base"
+            style={{ borderRadius: 'var(--radius-sm)' }}
+          >
+            <span aria-hidden="true">◈</span>
+            <span>Cart</span>
+            {count > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1
+                           bg-black text-white text-[10px] font-bold flex items-center justify-center tabular-nums"
+                style={{ borderRadius: 'var(--radius-full)' }}
+                aria-live="polite"
+              >
+                {count > 99 ? '99+' : count}
+              </span>
+            )}
+          </button>
+        </div>
       </nav>
     </header>
   );

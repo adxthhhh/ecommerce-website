@@ -12,31 +12,42 @@ Tech Stack
 ├── Language:         TypeScript (strict mode)
 ├── Styling:          Tailwind CSS v4 (via @import "tailwindcss") + custom CSS vars
 ├── State:            Zustand 5 with persist middleware (localStorage)
-├── Auth/DB:          Supabase (NOT YET CONNECTED — mock data in use)
-├── ORM:              Prisma (schema written, NOT YET MIGRATED)
+├── Auth/DB:          Supabase (LIVE CONNECTION ACTIVE ✅)
+├── ORM:              Prisma v7 (Configured via prisma.config.ts)
 └── Fonts:            Inter via next/font/google
 
 Directory Layout
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx          ✅ Root layout (Inter, Navbar, CartDrawer)
-│   │   ├── page.tsx            ✅ Customer Catalog (bento grid + filters)
-│   │   ├── globals.css         ✅ Design system (CSS vars, squircle, animations)
-│   │   ├── checkout/           ✅ Checkout page (form, summary, success state)
-│   │   ├── admin/              ✅ Admin dashboard (metrics, orders table, assignment)
-│   │   └── delivery/           ✅ Delivery portal (assigned orders, status toggles)
+│   │   ├── layout.tsx          ✅ Root layout
+│   │   ├── page.tsx            ✅ Customer Catalog (LIVE DATABASE FETCH ✅)
+│   │   ├── globals.css         ✅ Design system
+│   │   ├── checkout/           ✅ Checkout page (Mock submission)
+│   │   ├── admin/              ✅ Admin dashboard (Mock metrics)
+│   │   ├── delivery/           ✅ Delivery portal (Mock status)
+│   │   ├── login/              ✅ Login page (Pure squircle design)
+│   │   ├── signup/             ✅ Signup page (Pure squircle design)
+│   │   └── auth/               ✅ Auth actions (Server Actions)
 │   ├── components/
-│   │   ├── Navbar.tsx          ✅ Sticky nav + cart badge (Zustand)
-│   │   ├── CartDrawer.tsx      ✅ Slide-in cart panel (Zustand)
-│   │   └── ProductCard.tsx     ✅ Bento card + add-to-cart
+│   │   ├── Navbar.tsx          ✅ Sticky nav (Session aware)
+│   │   ├── CartDrawer.tsx      ✅ Slide-in cart
+│   │   ├── ProductCard.tsx     ✅ Bento card
+│   │   └── CatalogList.tsx     ✅ Client-side filter/search for live products
 │   ├── lib/
-│   │   └── mock-data.ts        ✅ 9 products, 2 orders, 3 users, stats
+│   │   ├── prisma.ts           ✅ Prisma Singleton (with PrismaPg adapter)
+│   │   ├── auth.ts             ✅ Auth/Role utilities
+│   │   ├── supabase/           ✅ SSR Supabase Clients (Client/Server/Middleware)
+│   │   └── mock-data.ts        ✅ Still used for stats/orders (Sync pending)
 │   ├── store/
-│   │   └── cartStore.ts        ✅ Zustand store (add/remove/qty/clear/persist)
+│   │   └── cartStore.ts        ✅ Zustand cart
 │   └── types/
 │       └── index.ts            ✅ All TypeScript interfaces
 ├── prisma/
-│   └── schema.prisma           ✅ Written & APPROVED
+│   ├── schema.prisma           ✅ Pushed to Supabase
+│   ├── seed.ts                 ✅ Seeded mock products to live DB
+│   └── prisma.config.ts        ✅ Prisma 7 configuration (CLI connection)
+├── middleware.ts               ✅ Route protection & Session refresh
+├── SUPABASE_SETUP.md           ✅ Database trigger instructions
 ├── HANDOFF.md
 └── package.json
 ```
@@ -50,53 +61,43 @@ Directory Layout
 | 1 | Project plan & HANDOFF.md created                  | ✅ Done    |
 | 2 | Next.js 16 project initialized (TS + Tailwind)     | ✅ Done    |
 | 3 | `schema.prisma` written & APPROVED                 | ✅ Done    |
-| 4 | TypeScript interfaces (`src/types/index.ts`)        | ✅ Done    |
-| 5 | Mock/seed data (`src/lib/mock-data.ts`)             | ✅ Done    |
-| 6 | Zustand cart store + localStorage persist           | ✅ Done    |
-| 7 | Design system CSS (`globals.css`)                  | ✅ Done    |
-| 8 | Navbar & CartDrawer UI                             | ✅ Done    |
-| 9 | Customer Catalog page (Bento grid)                 | ✅ Done    |
-| 10| Checkout flow (Form + Success state)               | ✅ Done    |
-| 11| Admin Dashboard (Metrics + Order Assignment)        | ✅ Done    |
-| 12| Delivery Dashboard (Status Management)              | ✅ Done    |
-| 13| Supabase connection + Prisma migration             | ⏳ Pending |
+| 4 | Prisma 7 Transition (Adapter + config setup)       | ✅ Done    |
+| 5 | Live Supabase Connection (.env.local)              | ✅ Done    |
+| 6 | Database Seeding (Mock products pushed to live)    | ✅ Done    |
+| 7 | **Customer Catalog (Real-time DB Fetch)**          | ✅ Done    |
+| 8 | Checkout page (UI/Mock logic)                      | ✅ Done    |
+| 9 | Admin Dashboard (UI/Mock logic)                    | ✅ Done    |
+| 10| Delivery Dashboard (UI/Mock logic)                 | ✅ Done    |
+| 11| **Supabase Auth & RBAC (SSR + Logic)**             | ✅ Done    |
+| 12| Real Order Creation (Checkout → DB)                | ⏳ Pending |
 
 ---
 
-## 🔐 Environment Setup (No Changes)
-
-Create `.env.local` in the project root:
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-
-# Prisma
-DATABASE_URL=postgresql://<user>:<password>@<host>:6543/<dbname>?schema=public&pgbouncer=true&connection_limit=1
-DIRECT_URL=postgresql://<user>:<password>@<host>:5432/<dbname>?schema=public
-```
+## ⚡ Prisma 7 Migration Notes
+We have upgraded to **Prisma 7**. Note the following changes:
+- `schema.prisma` no longer contains the `url` property.
+- `prisma.config.ts` handles CLI connections (using `DIRECT_URL`).
+- `PrismaClient` must be initialized with the `@prisma/adapter-pg` in `src/lib/prisma.ts` for runtime usage.
 
 ---
 
-## 🐛 Current State / Known Issues
-
-- **Mock mode remains active**: All logic utilizes local state and `mock-data.ts`.
-- **Logic Sync**: Admin and Delivery dashboards use local component state to simulate updates; refreshing the page resets these changes as they are not currently persisted to a database.
-- **Role Protection**: Pages are technically "open" since Supabase Auth has not yet been integrated.
-
----
-
-## ⚡ Immediate Next Steps (Step E)
-
-### Step E — Wire up Supabase + Prisma
-1. Run `npx prisma migrate dev --name init` to push schema to Supabase.
-2. Initialize Prisma client in `src/lib/prisma.ts`.
-3. Set up Supabase Auth (Login/Signup pages).
-4. Implement Middleware to protect `/admin` and `/delivery` based on user role metadata.
-5. Replace mock state in dashboards with Server Actions and React's `useOptimistic` for real-time status updates via Supabase.
+## 🔐 Environment Setup
+- `DATABASE_URL`: Transaction pooler URL (PgBouncer).
+- `DIRECT_URL`: Direct database URL for migrations/CLI.
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key.
+- **Passwords with special characters** (like `@`) must be URL-encoded (e.g., `%40`).
 
 ---
 
-*Last updated by: Antigravity AI — Session 3 (2026-04-14)*
+## ⚡ Immediate Next Steps
+
+### Step F — Wire up Real Order Logic
+1. Create a `createOrder` Server Action in `src/app/checkout/actions.ts`.
+2. Update the checkout form to call this action (now requires `customerId` from auth).
+3. Use a transaction in Prisma to create the `Order` and associated `OrderItem` entries.
+4. Update Admin dashboard to fetch live orders from `prisma.order.findMany`.
+
+---
+
+*Last updated by: Antigravity AI — Session 5 (2026-04-14)*
