@@ -18,9 +18,12 @@ export default function Navbar() {
   const count = totalItems();
   
   const [user, setUser] = useState<User | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
+    setIsMounted(true);
+    
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
@@ -91,7 +94,7 @@ export default function Navbar() {
           <button
             id="nav-cart-btn"
             onClick={toggleCart}
-            aria-label={`Open cart, ${count} item${count !== 1 ? 's' : ''}`}
+            aria-label={isMounted ? `Open cart, ${count} item${count !== 1 ? 's' : ''}` : 'Open cart'}
             className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold
                        border border-[#e5e5e5] text-black hover:border-black hover:bg-black
                        hover:text-white transition-base"
@@ -99,7 +102,7 @@ export default function Navbar() {
           >
             <span aria-hidden="true">◈</span>
             <span>Cart</span>
-            {count > 0 && (
+            {isMounted && count > 0 && (
               <span
                 className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1
                            bg-black text-white text-[10px] font-bold flex items-center justify-center tabular-nums"
