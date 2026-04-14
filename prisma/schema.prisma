@@ -1,0 +1,133 @@
+// ============================================================
+// schema.prisma — E-Commerce Application
+// ORM: Prisma  |  DB: PostgreSQL (Supabase)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Use connection pooling URL at runtime (PgBouncer)
+  url       = env("DATABASE_URL")
+  // Use direct URL only for migrations
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+/// Application-level role stored in Supabase Auth user_metadata
+/// and mirrored here for Prisma-level queries.
+enum Role {
+  CUSTOMER
+  ADMIN
+  DELIVERY_BOY
+}
+
+/// Lifecycle states of an order.
+enum OrderStatus {
+  PENDING          // Placed, awaiting admin action
+  CONFIRMED        // Admin has reviewed and confirmed
+  ASSIGNED         // Assigned to a delivery boy, not yet picked up
+  OUT_FOR_DELIVERY // Delivery boy has picked up the parcel
+  DELIVERED        // Successfully delivered to customer
+  CANCELLED        // Cancelled by admin or customer
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+/// Mirrors Supabase Auth users. The `id` MUST match auth.users.id
+/// (UUID). Created automatically by a Supabase trigger or manually
+/// on first sign-in.
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  role      Role     @default(CUSTOMER)
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  /// Orders placed BY this user (as a customer)
+  ordersAsCustomer      Order[] @relation("CustomerOrders")
+  /// Orders ASSIGNED TO this user (as a delivery boy)
+  ordersAsDeliveryBoy   Order[] @relation("DeliveryBoyOrders")
+
+  @@map("users")
+}
+
+/// Product catalog entry.
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?  @map("image_url")
+  stock       Int      @default(0)
+  category    String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+/// A single customer order — the "cart" once checked out.
+model Order {
+  id String @id @default(cuid())
+
+  // --- Participants ---
+  customerId    String  @map("customer_id") @db.Uuid
+  customer      User    @relation("CustomerOrders", fields: [customerId], references: [id])
+
+  deliveryBoyId String? @map("delivery_boy_id") @db.Uuid
+  deliveryBoy   User?   @relation("DeliveryBoyOrders", fields: [deliveryBoyId], references: [id])
+
+  // --- Status & Financials ---
+  status        OrderStatus @default(PENDING)
+  totalAmount   Decimal     @db.Decimal(10, 2) @map("total_amount")
+
+  // --- Shipping ---
+  /// Stored as a JSON blob for flexibility (name, street, city, state, zip, country, phone)
+  shippingAddress Json @map("shipping_address")
+
+  // --- Notes ---
+  adminNotes    String? @db.Text @map("admin_notes")
+  deliveryNotes String? @db.Text @map("delivery_notes")
+
+  // --- Timestamps ---
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deliveredAt DateTime? @map("delivered_at")
+
+  // Relations
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+/// A line-item within an Order — snapshot of the product at purchase time.
+model OrderItem {
+  id String @id @default(cuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity        Int     @default(1)
+  /// Price captured AT THE TIME OF PURCHASE — decoupled from Product.price
+  priceAtPurchase Decimal @db.Decimal(10, 2) @map("price_at_purchase")
+
+  @@map("order_items")
+}
